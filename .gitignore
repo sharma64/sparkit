@@ -5,5 +5,7 @@ output/
 .env
 .env.*
 *.log
+__pycache__/
+*.pyc
 *worksheets*.json
 !package.json

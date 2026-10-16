@@ -153,3 +153,36 @@ input[readonly] { opacity: .8; }
   max-width: 640px; margin: 8px auto 96px; padding: 0 24px;
   text-align: center; font-size: 11px; color: var(--muted); opacity: .85;
 }
+
+.eyebrow { color: var(--accent); letter-spacing: .12em; font-size: 10px; font-weight: 700; margin: 8px 0 12px; }
+.spaced { margin-top: 16px; }
+.card h2 { font-size: 18px; margin: 0 0 16px; }
+.save-btn { width: 100%; min-height: 44px; padding: 12px; margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--accent); background: transparent; font-size: 14px; cursor: pointer; }
+.save-btn:disabled { opacity: .4; cursor: default; }
+.save-btn:not(:disabled):hover { border-color: var(--accent); }
+.result { white-space: normal; overflow-wrap: anywhere; }
+.result strong { display: block; font-size: 19px; color: var(--accent); }
+.result details { margin-top: 16px; }
+.result details summary { font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text); }
+.result details p { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; line-height: 1.65; margin: 10px 0; }
+.result .assumptions { color: var(--muted); font-size: 12px; margin-bottom: 0; }
+input:disabled { opacity: .5; }
+.worksheet + .worksheet { margin-top: 12px; }
+.worksheet h2 { margin-bottom: 3px; overflow-wrap: anywhere; }
+.worksheet p { overflow-wrap: anywhere; }
+.empty { color: var(--muted); padding: 28px 0; font-size: 14px; }
+.tab { min-width: 0; min-height: 48px; font-size: 10px; }
+button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+a { color: var(--accent); }
+dialog { color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 16px; width: min(480px, calc(100% - 32px)); padding: 24px; max-height: calc(100dvh - 40px); }
+dialog::backdrop { background: #000b; }
+dialog h2 { margin-top: 0; }
+textarea { width: 100%; resize: vertical; background: var(--panel-2); border: 1px solid var(--line); color: var(--text); font: inherit; font-size: 16px; padding: 12px; border-radius: 10px; }
+textarea:focus { outline: 2px solid var(--accent); }
+#save-status { color: var(--bad); font-size: 13px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@media (max-width: 380px) {
+  .row { flex-wrap: wrap; }
+  .btn.ghost { flex: 1; }
+  .region { font-size: 10px; }
+}

@@ -1,241 +1,139 @@
 <!DOCTYPE html>
 <html lang="en-AU">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f1115" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <meta name="description" content="Electrical calculations with working, unit conversions and saved offline worksheets.">
   <title>Sparkit — Apprentice Toolkit</title>
-  <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
-  <link rel="apple-touch-icon" href="icons/icon.svg" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="bolt" aria-hidden="true">⚡</span>
-      <span>Sparkit</span>
-    </div>
-    <span class="region" title="Australian / New Zealand standards">AS/NZS · 230/400V</span>
-  </header>
-
-  <section class="ask" id="ask">
-    <div class="ask-bar">
-      <span class="ask-ico" aria-hidden="true">🔎</span>
-      <input id="ask-input" type="search" inputmode="search" autocomplete="off"
-             placeholder="Ask a standard… e.g. max voltage drop, RCD for power points" />
-    </div>
-    <p class="ask-sub">Points you to the right standard to read — the final call is always the licensed person's.</p>
-    <div id="ask-results" class="ask-results" hidden></div>
-  </section>
-
+  <header class="topbar"><div class="brand"><span class="bolt" aria-hidden="true">⚡</span> Sparkit</div><span class="region">Your pocket toolkit</span></header>
   <main id="app">
-    <!-- OHM'S LAW -->
-    <section class="screen" id="ohms" data-screen>
-      <h1>Ohm's Law &amp; Power</h1>
-      <p class="sub">Enter any two values — the rest are calculated.</p>
-      <div class="card">
+    <section id="ohms" class="screen" data-screen>
+      <p class="eyebrow">CALCULATE · UNDERSTAND · KEEP</p>
+      <h1>Ohm’s Law &amp; Power</h1>
+      <p class="sub">Enter two known values. Get the answer and see how it’s worked out.</p>
+      <form class="card" data-tool="ohms">
         <div class="grid2">
-          <label>Voltage <span>V</span>
-            <input id="ohm-v" type="text" inputmode="decimal" placeholder="volts" />
-          </label>
-          <label>Current <span>A</span>
-            <input id="ohm-i" type="text" inputmode="decimal" placeholder="amps" />
-          </label>
-          <label>Resistance <span>Ω</span>
-            <input id="ohm-r" type="text" inputmode="decimal" placeholder="ohms" />
-          </label>
-          <label>Power <span>W</span>
-            <input id="ohm-p" type="text" inputmode="decimal" placeholder="watts" />
-          </label>
+          <label>Voltage <span>V</span><input id="ohm-v" inputmode="decimal" placeholder="e.g. 230"></label>
+          <label>Current <span>A</span><input id="ohm-i" inputmode="decimal" placeholder="e.g. 10"></label>
+          <label>Resistance <span>Ω</span><input id="ohm-r" inputmode="decimal" placeholder="unknown"></label>
+          <label>Power <span>W</span><input id="ohm-p" inputmode="decimal" placeholder="unknown"></label>
         </div>
-        <div class="row">
-          <button class="btn" data-calc="ohms">Calculate</button>
-          <button class="btn ghost" data-clear="ohms">Clear</button>
-        </div>
-        <p class="result" id="ohm-result" aria-live="polite"></p>
-      </div>
-      <p class="clause">V = I·R &nbsp;·&nbsp; P = V·I &nbsp;·&nbsp; P = I²·R</p>
+        <div class="row"><button class="btn">Calculate</button><button class="btn ghost" type="button" data-example="ohms">Try example</button></div>
+        <div id="ohms-result" class="result" role="status" aria-live="polite"></div>
+        <button class="save-btn" type="button" data-save="ohms" disabled>Save worksheet</button>
+      </form>
     </section>
-
-    <!-- VOLTAGE DROP -->
-    <section class="screen" id="vdrop" data-screen hidden>
-      <h1>Voltage Drop</h1>
-      <p class="sub">Pick the unknown, enter the other three.</p>
-      <div class="card">
-        <label class="full">Solve for
-          <select id="vd-solve">
-            <option value="vd">Voltage drop (V)</option>
-            <option value="i">Current (A)</option>
-            <option value="l">Route length (m)</option>
-            <option value="k">Cable mV/A/m</option>
-          </select>
-        </label>
-        <div class="grid2">
-          <label data-vd="vd">Voltage drop <span>V</span>
-            <input id="vd-vd" type="text" inputmode="decimal" placeholder="volts" />
-          </label>
-          <label data-vd="i">Current <span>A</span>
-            <input id="vd-i" type="text" inputmode="decimal" placeholder="amps" />
-          </label>
-          <label data-vd="l">Route length <span>m</span>
-            <input id="vd-l" type="text" inputmode="decimal" placeholder="metres (one way)" />
-          </label>
-          <label data-vd="k">Cable mV/A/m <span>AS/NZS 3008</span>
-            <input id="vd-k" type="text" inputmode="decimal" placeholder="from cable table" />
-          </label>
+    <section id="vdrop" class="screen" data-screen hidden>
+      <h1>Voltage Drop</h1><p class="sub">Choose the unknown. Use the cable table value that matches your circuit.</p>
+      <form class="card" data-tool="vdrop">
+        <label>Solve for<select id="vd-solve"><option value="drop">Voltage drop (V)</option><option value="current">Current (A)</option><option value="length">Route length (m)</option><option value="mvPerAmpPerM">Cable mV/A/m</option></select></label>
+        <div class="grid2 spaced">
+          <label>Voltage drop <span>V</span><input id="vd-vd" inputmode="decimal"></label>
+          <label>Current <span>A</span><input id="vd-i" inputmode="decimal"></label>
+          <label>Route length <span>m · one way</span><input id="vd-l" inputmode="decimal"></label>
+          <label>Cable table value <span>mV/A/m</span><input id="vd-k" inputmode="decimal"></label>
+          <label>Nominal voltage <span>V</span><input id="vd-nominal" inputmode="decimal" value="230"></label>
+          <label>Comparison limit <span>% · optional</span><input id="vd-limit" inputmode="decimal" placeholder="from applicable requirements"></label>
         </div>
-        <div class="grid2">
-          <label>Phase
-            <select id="vd-phase">
-              <option value="single">Single (230V)</option>
-              <option value="three">Three (400V)</option>
-            </select>
-          </label>
-          <label>Nominal voltage <span>V</span>
-            <input id="vd-nominal" type="text" inputmode="decimal" value="230" />
-          </label>
-        </div>
-        <label class="full">Max drop allowed <span>%</span>
-          <input id="vd-limit" type="text" inputmode="decimal" placeholder="from job / current standard" />
-        </label>
-        <div class="row">
-          <button class="btn" data-calc="vdrop">Calculate</button>
-          <button class="btn ghost" data-clear="vdrop">Clear</button>
-        </div>
-        <p class="result" id="vd-result" aria-live="polite"></p>
-      </div>
-      <p class="clause">Vd = (L × I × mV/A/m) ÷ 1000. Use the table value and any comparison limit that apply to the installation; this tool does not determine compliance.</p>
+        <div class="row"><button class="btn">Calculate</button><button class="btn ghost" type="button" data-example="vdrop">Try example</button></div>
+        <div id="vdrop-result" class="result" role="status" aria-live="polite"></div>
+        <button class="save-btn" type="button" data-save="vdrop" disabled>Save worksheet</button>
+      </form>
     </section>
-
-    <!-- THREE PHASE -->
-    <section class="screen" id="three" data-screen hidden>
-      <h1>Three-Phase Power</h1>
-      <p class="sub">Balanced three-phase load. Phase voltage shown is for a wye (star) connection.</p>
-      <div class="card">
-        <div class="grid2">
-          <label>Line voltage V<sub>L</sub> <span>V</span>
-            <input id="tp-vl" type="text" inputmode="decimal" placeholder="400" />
-          </label>
-          <label>Line current I<sub>L</sub> <span>A</span>
-            <input id="tp-il" type="text" inputmode="decimal" placeholder="amps" />
-          </label>
-          <label>Power factor <span>0–1</span>
-            <input id="tp-pf" type="text" inputmode="decimal" placeholder="0.8" />
-          </label>
-          <label>Phase voltage V<sub>ph</sub> <span>V (calc)</span>
-            <input id="tp-vph" type="text" inputmode="decimal" placeholder="auto" readonly />
-          </label>
+    <section id="three" class="screen" data-screen hidden>
+      <h1>Three-Phase Power</h1><p class="sub">Balanced loads. Choose the connection to calculate phase voltage correctly.</p>
+      <form class="card" data-tool="three">
+        <label>Connection<select id="tp-connection"><option value="star">Star (wye)</option><option value="delta">Delta</option></select></label>
+        <div class="grid2 spaced">
+          <label>Line voltage <span>V</span><input id="tp-vl" inputmode="decimal" placeholder="400"></label>
+          <label>Line current <span>A</span><input id="tp-il" inputmode="decimal"></label>
+          <label>Power factor <span>0–1 · optional</span><input id="tp-pf" inputmode="decimal" placeholder="0.8"></label>
         </div>
-        <div class="row">
-          <button class="btn" data-calc="three">Calculate</button>
-          <button class="btn ghost" data-clear="three">Clear</button>
-        </div>
-        <p class="result" id="tp-result" aria-live="polite"></p>
-      </div>
-      <p class="clause">V<sub>L</sub> = √3 · V<sub>ph</sub> &nbsp;·&nbsp; P = √3 · V<sub>L</sub> · I<sub>L</sub> · pf &nbsp;·&nbsp; S = √3 · V<sub>L</sub> · I<sub>L</sub></p>
+        <div class="row"><button class="btn">Calculate</button><button class="btn ghost" type="button" data-example="three">Try example</button></div>
+        <div id="three-result" class="result" role="status" aria-live="polite"></div>
+        <button class="save-btn" type="button" data-save="three" disabled>Save worksheet</button>
+      </form>
     </section>
-
-    <!-- CONDUIT FILL + DERATINGS -->
-    <section class="screen" id="conduit" data-screen hidden>
-      <h1>Conduit Fill</h1>
-      <p class="sub">Cable overall diameters vs conduit internal diameter.</p>
-      <div class="card">
-        <label class="full">Conduit internal diameter <span>mm</span>
-          <input id="cf-id" type="text" inputmode="decimal" placeholder="e.g. 20.4 for 25mm PVC" />
-        </label>
-        <div id="cf-cables"></div>
-        <div class="row">
-          <button class="btn ghost" id="cf-add">+ Add cable</button>
-        </div>
-        <div class="row">
-          <button class="btn" data-calc="conduit">Calculate</button>
-          <button class="btn ghost" data-clear="conduit">Clear</button>
-        </div>
-        <p class="result" id="cf-result" aria-live="polite"></p>
-      </div>
-      <p class="clause">Geometric fill % = Σ cable cross-sectional area ÷ conduit internal area. Verify the applicable enclosure or space-factor rule for the installation.</p>
-
-      <h2 class="section-h">Cable Deratings</h2>
-      <p class="sub">Start from the table current-carrying capacity, then apply correction factors.</p>
-      <div class="card">
+    <section id="conduit" class="screen" data-screen hidden>
+      <h1>Conduit &amp; Cable</h1><p class="sub">Check geometry and work through your correction factors.</p>
+      <form class="card" data-tool="conduit">
+        <h2>Conduit fill</h2>
+        <label>Conduit internal diameter <span>mm</span><input id="cf-id" inputmode="decimal"></label>
+        <div id="cf-cables" class="spaced"></div>
+        <button type="button" class="save-btn" id="cf-add">+ Add cable</button>
+        <div class="row"><button class="btn">Calculate fill</button><button class="btn ghost" type="button" data-example="conduit">Try example</button></div>
+        <div id="conduit-result" class="result" role="status" aria-live="polite"></div>
+        <button class="save-btn" type="button" data-save="conduit" disabled>Save worksheet</button>
+      </form>
+      <form class="card spaced" data-tool="derate">
+        <h2>Corrected current capacity</h2>
         <div class="grid2">
-          <label>Base capacity <span>A — AS/NZS 3008</span>
-            <input id="dr-base" type="text" inputmode="decimal" placeholder="from table" />
-          </label>
-          <label>Design load <span>A</span>
-            <input id="dr-load" type="text" inputmode="decimal" placeholder="circuit current" />
-          </label>
-          <label>Ambient temp factor
-            <input id="dr-ka" type="text" inputmode="decimal" value="1.00" />
-          </label>
-          <label>Grouping factor
-            <input id="dr-kg" type="text" inputmode="decimal" value="1.00" />
-          </label>
-          <label>Thermal insulation
-            <input id="dr-ki" type="text" inputmode="decimal" value="1.00" />
-          </label>
-          <label>Other factor
-            <input id="dr-ko" type="text" inputmode="decimal" value="1.00" />
-          </label>
+          <label>Base table capacity <span>A</span><input id="dr-base" inputmode="decimal"></label>
+          <label>Design load <span>A · optional</span><input id="dr-load" inputmode="decimal"></label>
+          <label>Ambient factor<input id="dr-ka" inputmode="decimal" value="1"></label>
+          <label>Grouping factor<input id="dr-kg" inputmode="decimal" value="1"></label>
+          <label>Insulation factor<input id="dr-ki" inputmode="decimal" value="1"></label>
+          <label>Other factor<input id="dr-ko" inputmode="decimal" value="1"></label>
         </div>
-        <p class="clause">Enter correction factors from the applicable current standard and installation method. The result is a numerical comparison, not cable-selection approval.</p>
-        <div class="row">
-          <button class="btn" data-calc="derate">Calculate</button>
-          <button class="btn ghost" data-clear="derate">Clear</button>
-        </div>
-        <p class="result" id="dr-result" aria-live="polite"></p>
-      </div>
-      <p class="clause">Derated capacity = base × ambient × grouping × insulation × other. Must stay ≥ design load.</p>
+        <div class="row"><button class="btn">Calculate capacity</button><button class="btn ghost" type="button" data-example="derate">Try example</button></div>
+        <div id="derate-result" class="result" role="status" aria-live="polite"></div>
+        <button class="save-btn" type="button" data-save="derate" disabled>Save worksheet</button>
+      </form>
     </section>
-
-    <!-- RULES -->
-    <section class="screen" id="rules" data-screen hidden>
-      <h1>Rules Reference</h1>
-      <p class="sub">Quick signposts. Always verify against the current standard and local regulator guidance.</p>
-
-      <div class="card rulecard">
-        <h3>Reference status</h3>
-        <p>Australia-focused source links checked 16 October 2026: <a href="https://www.standards.org.au/flagship-projects/wiring-rules" target="_blank" rel="noopener">AS/NZS 3000 Wiring Rules</a>, <a href="https://www.standards.org.au/standards-catalogue/standard-details?designation=as-nzs-3008-1-1-2025" target="_blank" rel="noopener">AS/NZS 3008.1.1:2025 cable selection</a>, and <a href="https://www.nsw.gov.au/housing-and-construction/compliance-and-regulation/electricians/electrical-standards-rules-and-notes" target="_blank" rel="noopener">NSW electrical rules and notes</a>.</p>
-        <p>This is a study aid, not a live compliance service. Check the applicable edition, amendments and jurisdiction before work starts.</p>
-      </div>
-
-      <div class="card rulecard">
-        <h3>Cable colours (AU)</h3>
-        <p><b>Single phase:</b> Active brown (was red), Neutral blue (was black), Earth green/yellow.</p>
-        <p><b>Three phase:</b> Brown · Black · Grey (was Red · White · Blue).</p>
-      </div>
-      <div class="card rulecard">
-        <h3>IP ratings</h3>
-        <p><b>1st digit (solids):</b> 4 = &gt;1mm wire · 5 = dust protected · 6 = dust tight.</p>
-        <p><b>2nd digit (water):</b> 4 = splash · 5 = jets · 6 = strong jets · 7 = immersion.</p>
-      </div>
-      <div class="card rulecard">
-        <h3>RCD protection (AS/NZS 3000)</h3>
-        <p>Check the current AS/NZS 3000 requirements, exemptions and circuit grouping limits for the installation.</p>
-      </div>
-      <div class="card rulecard">
-        <h3>Disconnection times</h3>
-        <p>Use the current standard’s table for the circuit type and earthing arrangement.</p>
-      </div>
-      <div class="card rulecard">
-        <h3>Voltage drop</h3>
-        <p>Confirm the applicable limit and installation scope in the current standard before relying on a calculated percentage.</p>
-      </div>
+    <section id="convert" class="screen" data-screen hidden>
+      <h1>Unit Converter</h1><p class="sub">Quick conversions, with the factor shown.</p>
+      <form class="card" data-tool="convert">
+        <label>Quantity<select id="conv-group"></select></label>
+        <div class="grid2 spaced"><label>From<select id="conv-from"></select></label><label>To<select id="conv-to"></select></label></div>
+        <label class="spaced">Value<input id="conv-value" inputmode="decimal" placeholder="e.g. 2500"></label>
+        <div class="row"><button class="btn">Convert</button><button class="btn ghost" type="button" id="conv-swap">Swap units</button></div>
+        <div id="convert-result" class="result" role="status" aria-live="polite"></div>
+        <button class="save-btn" type="button" data-save="convert" disabled>Save worksheet</button>
+      </form>
+    </section>
+    <section id="saved" class="screen" data-screen hidden>
+      <h1>Saved Worksheets</h1><p class="sub">Names, inputs and notes, kept on this device. Reopen one to recalculate.</p>
+      <label class="visually-hidden" for="saved-search">Search worksheets</label><input id="saved-search" type="search" placeholder="Search name, tool or notes">
+      <div id="saved-status" class="result" role="status" aria-live="polite"></div>
+      <div id="saved-list" class="spaced"></div>
+      <button type="button" class="save-btn" id="saved-export">Export worksheets (JSON)</button>
+      <button type="button" class="save-btn" id="saved-import">Restore worksheets from JSON</button><input id="saved-file" type="file" accept="application/json,.json" hidden>
+      <p class="clause">This device only — no account or cloud sync. Export a backup before clearing browser data or moving devices.</p>
+    </section>
+    <section id="rules" class="screen" data-screen hidden>
+      <h1>Reference Shelf</h1><p class="sub">Official sources to read alongside your calculations.</p>
+      <div class="card rulecard"><h2>Wiring Rules</h2><p><a href="https://www.standards.org.au/flagship-projects/wiring-rules" target="_blank" rel="noopener">Standards Australia · AS/NZS 3000</a></p><p>Use the applicable edition and amendments for your jurisdiction and installation.</p></div>
+      <div class="card rulecard"><h2>Cable selection</h2><p><a href="https://www.standards.org.au/standards-catalogue/standard-details?designation=as-nzs-3008-1-1-2025" target="_blank" rel="noopener">AS/NZS 3008.1.1:2025 · publisher catalogue</a></p><p>Australian installation conditions. Use applicable table values in the voltage-drop and correction-factor tools.</p></div>
+      <div class="card rulecard"><h2>NSW electrical guidance</h2><p><a href="https://www.nsw.gov.au/housing-and-construction/compliance-and-regulation/electricians/electrical-standards-rules-and-notes" target="_blank" rel="noopener">NSW Government · standards, rules and notes</a></p><p>NSW-specific guidance. Other jurisdictions have their own requirements.</p></div>
+      <p class="clause">Source links checked 16 October 2026. This shelf is a set of signposts, not a live regulations feed. Source sites require a connection.</p>
     </section>
   </main>
-
-  <nav class="tabbar">
-    <button class="tab active" data-go="ohms"><span>Ω</span>Ohm's</button>
-    <button class="tab" data-go="vdrop"><span>V↓</span>V-Drop</button>
-    <button class="tab" data-go="three"><span>3Φ</span>3-Phase</button>
-    <button class="tab" data-go="conduit"><span>◎</span>Conduit</button>
-    <button class="tab" data-go="rules"><span>§</span>Rules</button>
+  <nav class="tabbar" aria-label="Tools">
+    <button class="tab active" data-go="ohms" aria-current="page"><span aria-hidden="true">Ω</span>Ohm’s</button>
+    <button class="tab" data-go="vdrop"><span aria-hidden="true">V↓</span>V-drop</button>
+    <button class="tab" data-go="three"><span aria-hidden="true">3Φ</span>3-phase</button>
+    <button class="tab" data-go="conduit"><span aria-hidden="true">◎</span>Cable</button>
+    <button class="tab" data-go="convert"><span aria-hidden="true">⇄</span>Convert</button>
+    <button class="tab" data-go="saved"><span aria-hidden="true">▤</span>Saved</button>
+    <button class="tab" data-go="rules"><span aria-hidden="true">§</span>Reference</button>
   </nav>
-
-  <p class="disclaimer">Study &amp; field aid only. Verify every result against current AS/NZS standards and your licensed supervisor before relying on it.</p>
-
-  <script src="calculators.js"></script>
-  <script src="app.js"></script>
+  <p class="disclaimer">Study &amp; field aid. Verify calculations and applicable requirements with the current standards and your licensed supervisor.</p>
+  <dialog id="save-dialog" aria-labelledby="save-heading">
+    <form id="save-form">
+      <h2 id="save-heading">Save worksheet</h2>
+      <label>Worksheet name<input id="save-name" required maxlength="80" autocomplete="off" placeholder="e.g. Workshop lighting run"></label>
+      <label class="spaced">Notes <span>optional</span><textarea id="save-notes" maxlength="1000" rows="3" placeholder="Assumptions, table reference or study notes"></textarea></label>
+      <p id="save-status" role="status" aria-live="polite"></p>
+      <div class="row"><button type="submit" class="btn">Save new worksheet</button><button type="button" id="save-cancel" class="btn ghost">Cancel</button></div>
+      <button type="submit" id="save-update" class="save-btn" hidden>Update existing worksheet</button>
+    </form>
+  </dialog>
+  <script src="calculators.js"></script><script src="worksheets.js"></script><script src="app.js"></script>
 </body>
 </html>

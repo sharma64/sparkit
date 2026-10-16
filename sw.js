@@ -1,39 +1,25 @@
-// Offline cache for the app shell. Network-first: always serve the latest when
-// online, fall back to cache only when offline (so on-site dead zones still work).
-const CACHE = 'sparkit-v3';
-const ASSETS = [
-  './',
-  './index.html',
-  './styles.css',
-  './calculators.js',
-  './app.js',
-  './manifest.webmanifest',
-  './icons/icon.svg',
-];
-
-self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+'use strict';
+const CACHE = 'sparkit-v4';
+const ASSETS = ['./', './index.html', './styles.css', './calculators.js', './worksheets.js', './app.js', './manifest.webmanifest', './icons/icon.svg'];
+const assetURLs = new Set(ASSETS.map((path) => new URL(path, self.location.href).href));
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
-
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE && k.startsWith('sparkit-')).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
+self.addEventListener('activate', (event) => {
+  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key.startsWith('sparkit-') && key !== CACHE).map((key) => caches.delete(key)))).then(() => self.clients.claim()));
 });
-
-self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET') return;
-  const url = new URL(e.request.url);
-  if (url.origin !== self.location.origin || url.pathname.includes('/api/')) return;
-  e.respondWith(
-    fetch(e.request)
-      .then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
-        return res;
-      })
-      .catch(() => caches.open(CACHE).then((cache) => cache.match(e.request).then((hit) => hit || cache.match('./index.html'))))
-  );
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url); url.search = ''; url.hash = '';
+  if (!assetURLs.has(url.href)) return;
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE);
+    try {
+      const response = await fetch(event.request);
+      if (response.ok && response.type === 'basic') await cache.put(url.href, response.clone());
+      return response;
+    } catch {
+      return await cache.match(url.href) || (event.request.mode === 'navigate' ? await cache.match('./index.html') : null) || Response.error();
+    }
+  })());
 });

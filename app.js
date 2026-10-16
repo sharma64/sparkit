@@ -1,294 +1,200 @@
 'use strict';
-
-// ---- helpers ----------------------------------------------------
 const $ = (id) => document.getElementById(id);
-const num = (id) => {
-  const raw = $(id).value.replace(/,/g, '').trim();
-  if (!raw) return null;
-  const v = Number(raw);
-  return Number.isFinite(v) ? v : null;
+const C = SparkitCalculators;
+const n = (id) => C.parseNumber($(id).value);
+const fmt = (v) => v.toLocaleString('en-AU', { maximumSignificantDigits: 9 });
+const names = { ohms: 'Ohm’s Law', vdrop: 'Voltage Drop', three: 'Three-Phase', conduit: 'Conduit Fill', derate: 'Corrected Capacity', convert: 'Unit Conversion' };
+const fields = {
+  ohms: ['ohm-v', 'ohm-i', 'ohm-r', 'ohm-p'],
+  vdrop: ['vd-solve', 'vd-vd', 'vd-i', 'vd-l', 'vd-k', 'vd-nominal', 'vd-limit'],
+  three: ['tp-vl', 'tp-il', 'tp-pf', 'tp-connection'],
+  conduit: ['cf-id'], derate: ['dr-base', 'dr-load', 'dr-ka', 'dr-kg', 'dr-ki', 'dr-ko'],
+  convert: ['conv-group', 'conv-from', 'conv-to', 'conv-value'],
 };
-const fmt = (n, d = 2) => {
-  if (!Number.isFinite(n)) return '–';
-  const r = Math.round(n * 10 ** d) / 10 ** d;
-  return r.toLocaleString('en-AU', { maximumFractionDigits: d });
-};
-const show = (id, html, state) => {
-  const el = $(id);
-  el.innerHTML = html;
-  el.className = 'result' + (state ? ' ' + state : '');
-};
-
-// ---- tab navigation ---------------------------------------------
-document.querySelectorAll('.tab').forEach((tab) => {
-  tab.addEventListener('click', () => {
-    const go = tab.dataset.go;
-    document.querySelectorAll('[data-screen]').forEach((s) => (s.hidden = s.id !== go));
-    document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t === tab));
-    window.scrollTo(0, 0);
-  });
-});
-
-// ---- Ohm's law / power wheel ------------------------------------
-const ohmInputs = ['ohm-v', 'ohm-i', 'ohm-r', 'ohm-p'];
-ohmInputs.forEach((id) => $(id).addEventListener('input', () => delete $(id).dataset.derived));
-
-function calcOhms() {
-  const entered = {
-    V: $('ohm-v').dataset.derived ? null : num('ohm-v'),
-    I: $('ohm-i').dataset.derived ? null : num('ohm-i'),
-    R: $('ohm-r').dataset.derived ? null : num('ohm-r'),
-    P: $('ohm-p').dataset.derived ? null : num('ohm-p'),
-  };
-  const result = SparkitCalculators.solveOhms(entered);
-  if (!result.ok) return show('ohm-result', result.message, 'bad');
-  const values = { V: ['ohm-v', result.V], I: ['ohm-i', result.I], R: ['ohm-r', result.R], P: ['ohm-p', result.P] };
-  Object.entries(values).forEach(([key, [id, value]]) => {
-    $(id).value = fmt(value, 3);
-    if (entered[key] === null) $(id).dataset.derived = 'true';
-    else delete $(id).dataset.derived;
-  });
-  show('ohm-result',
-    `<b>${fmt(result.V, 2)} V</b> · <b>${fmt(result.I, 3)} A</b> · <b>${fmt(result.R, 2)} Ω</b> · <b>${fmt(result.P, 2)} W</b>`,
-    'ok');
+const snapshots = new Map();
+let editingWorksheet = null;
+let saveTool = null;
+let worksheetStore;
+try { worksheetStore = new SparkitWorksheets.Store(localStorage); } catch { /* Storage may be disabled. Calculators still work. */ }
+function getStore() {
+  if (!worksheetStore) throw new Error('Browser storage is unavailable. Calculations still work; worksheets could not be saved.');
+  return worksheetStore;
 }
-
-// ---- Voltage drop solver (any 3 -> 4th) -------------------------
-function calcVdrop() {
-  const solveFor = $('vd-solve').value;
-  const result = SparkitCalculators.solveVoltageDrop({
-    solveFor, drop: num('vd-vd'), current: num('vd-i'), length: num('vd-l'),
-    mvPerAmpPerM: num('vd-k'), nominal: num('vd-nominal'), limitPct: num('vd-limit'),
+function navigate(screen) {
+  document.querySelectorAll('[data-screen]').forEach((s) => { s.hidden = s.id !== screen; });
+  document.querySelectorAll('[data-go]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.go === screen);
+    if (b.dataset.go === screen) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
-  if (!result.ok) return show('vd-result', result.message, 'bad');
-  const output = { vd: ['vd-vd', 'Voltage drop', 'V', 2], i: ['vd-i', 'Current', 'A', 2], l: ['vd-l', 'Route length', 'm', 2], k: ['vd-k', 'Required mV/A/m', 'mV/A/m', 3] }[solveFor];
-  $(output[0]).value = fmt(result.result, output[3]);
-  let extra = result.percentage === null ? '' : `\nDrop = ${fmt(result.percentage, 2)}% of ${fmt(num('vd-nominal'), 0)}V`;
-  if (result.comparison !== null) extra += result.comparison
-    ? ` — <span class="tag-ok">within your ${fmt(num('vd-limit'), 1)}% comparison</span>`
-    : ` — <span class="tag-bad">exceeds your ${fmt(num('vd-limit'), 1)}% comparison</span>`;
-  else if (result.percentage !== null) extra += ' — add a job/standard comparison if needed.';
-  show('vd-result', `<b>${output[1]}: ${fmt(result.result, output[3])} ${output[2]}</b>${extra}`, result.comparison === false ? 'bad' : result.comparison === true ? 'ok' : '');
+  if (screen === 'saved') renderSaved();
+  window.scrollTo(0, 0);
 }
-
-// keep nominal voltage in step with phase choice
-$('vd-phase').addEventListener('change', (e) => {
-  $('vd-nominal').value = e.target.value === 'three' ? '400' : '230';
-});
-
-// ---- Three-phase ------------------------------------------------
-function calcThree() {
-  const VL = num('tp-vl'), IL = num('tp-il'), pf = num('tp-pf');
-  const result = SparkitCalculators.threePhase({ lineVoltage: VL, lineCurrent: IL, powerFactor: pf });
-  if (!result.ok) return show('tp-result', result.message, 'bad');
-  $('tp-vph').value = fmt(result.phaseVoltage, 1);
-  if (result.real === null) {
-    return show('tp-result', `<b>Apparent power S = ${fmt(result.apparent / 1000, 2)} kVA</b>\nWye phase voltage = ${fmt(result.phaseVoltage, 1)} V\nAdd a power factor for kW / kVAR.`, 'ok');
+document.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.go)));
+function capture(tool) {
+  const inputs = Object.fromEntries(fields[tool].map((id) => [id, $(id).value]));
+  if (tool === 'conduit') inputs.cables = [...document.querySelectorAll('.cf-d')].map((el) => el.value);
+  return inputs;
+}
+function invalidate(tool) {
+  snapshots.delete(tool);
+  document.querySelector(`[data-save="${tool}"]`).disabled = true;
+  const output = $(`${tool}-result`);
+  if (output.textContent) { output.textContent = 'Inputs changed — calculate again to update the result.'; output.className = 'result'; }
+}
+function display(tool, result, summary, state = '') {
+  const output = $(`${tool}-result`);
+  output.replaceChildren(); output.className = `result ${result.ok ? state : 'bad'}`;
+  if (!result.ok) { output.textContent = result.message; snapshots.delete(tool); document.querySelector(`[data-save="${tool}"]`).disabled = true; return; }
+  const headline = document.createElement('strong'); headline.textContent = summary; output.append(headline);
+  const working = document.createElement('details'); working.open = true;
+  const heading = document.createElement('summary'); heading.textContent = 'See the working'; working.append(heading);
+  result.steps.forEach((step) => { const line = document.createElement('p'); line.textContent = step; working.append(line); });
+  output.append(working);
+  const assumptions = document.createElement('p'); assumptions.className = 'assumptions'; assumptions.textContent = result.assumptions; output.append(assumptions);
+  snapshots.set(tool, { tool, inputs: capture(tool), summary, steps: result.steps, assumptions: result.assumptions, calculationVersion: '0.2.0' });
+  document.querySelector(`[data-save="${tool}"]`).disabled = false;
+}
+function calculate(tool) {
+  if (tool === 'ohms') {
+    const r = C.solveOhms({ V: n('ohm-v'), I: n('ohm-i'), R: n('ohm-r'), P: n('ohm-p') });
+    display(tool, r, r.ok ? `${fmt(r.V)} V · ${fmt(r.I)} A · ${fmt(r.R)} Ω · ${fmt(r.P)} W` : '', 'ok');
+  } else if (tool === 'vdrop') {
+    const solveFor = $('vd-solve').value;
+    const r = C.solveVoltageDrop({ solveFor, drop: n('vd-vd'), current: n('vd-i'), length: n('vd-l'), mvPerAmpPerM: n('vd-k'), nominal: n('vd-nominal'), limitPct: n('vd-limit') });
+    const label = { drop: 'Voltage drop', current: 'Current', length: 'Route length', mvPerAmpPerM: 'Cable value' }[solveFor];
+    const unit = { drop: 'V', current: 'A', length: 'm', mvPerAmpPerM: 'mV/A/m' }[solveFor];
+    let text = r.ok ? `${label}: ${fmt(r.result)} ${unit}` : '';
+    if (r.percentage !== null && r.ok) text += ` · ${fmt(r.percentage)}% drop`;
+    if (r.comparison !== null && r.ok) text += r.comparison ? ' · within your comparison limit' : ' · exceeds your comparison limit';
+    display(tool, r, text, r.comparison === false ? 'bad' : '');
+  } else if (tool === 'three') {
+    const r = C.threePhase({ lineVoltage: n('tp-vl'), lineCurrent: n('tp-il'), powerFactor: n('tp-pf'), connection: $('tp-connection').value });
+    display(tool, r, r.ok ? `${fmt(r.apparent / 1000)} kVA${r.real === null ? '' : ` · ${fmt(r.real / 1000)} kW · ${fmt(r.reactive / 1000)} kVAR`} · phase ${fmt(r.phaseVoltage)} V` : '', 'ok');
+  } else if (tool === 'conduit') {
+    const r = C.conduitFill({ internalDiameter: n('cf-id'), cableDiameters: [...document.querySelectorAll('.cf-d')].map((el) => C.parseNumber(el.value)) });
+    display(tool, r, r.ok ? `${fmt(r.fillPercent)}% geometric fill` : '');
+  } else if (tool === 'derate') {
+    const r = C.derating({ base: n('dr-base'), load: n('dr-load'), factors: ['dr-ka', 'dr-kg', 'dr-ki', 'dr-ko'].map(n) });
+    display(tool, r, r.ok ? `${fmt(r.capacity)} A corrected capacity${r.comparison === null ? '' : r.comparison ? ' · meets or exceeds entered load' : ' · below entered load'}` : '', r.comparison === false ? 'bad' : '');
+  } else if (tool === 'convert') {
+    const r = C.convert({ group: $('conv-group').value, value: n('conv-value'), from: $('conv-from').value, to: $('conv-to').value });
+    display(tool, r, r.ok ? `${fmt(r.result)} ${r.unit}` : '', 'ok');
   }
-  show('tp-result',
-    `<b>P = ${fmt(result.real / 1000, 2)} kW</b> · S = ${fmt(result.apparent / 1000, 2)} kVA · Q = ${fmt(result.reactive / 1000, 2)} kVAR\nWye phase voltage = ${fmt(result.phaseVoltage, 1)} V · pf ${fmt(pf, 2)}`,
-    'ok');
 }
-
-// ---- Conduit fill -----------------------------------------------
-const cfWrap = $('cf-cables');
-function addCable(d = '') {
-  const row = document.createElement('div');
-  row.className = 'cable-row';
-  row.innerHTML =
-    `<label>Cable Ø <span>mm (overall)</span>
-       <input type="text" inputmode="decimal" class="cf-d" placeholder="e.g. 7.4" value="${d}" /></label>
-     <button type="button" aria-label="Remove cable">✕</button>`;
-  row.querySelector('button').addEventListener('click', () => row.remove());
-  cfWrap.appendChild(row);
+document.querySelectorAll('[data-tool]').forEach((form) => {
+  form.addEventListener('submit', (e) => { e.preventDefault(); calculate(form.dataset.tool); });
+  form.addEventListener('input', () => invalidate(form.dataset.tool));
+  form.addEventListener('change', () => invalidate(form.dataset.tool));
+  const clear = document.createElement('button'); clear.type = 'button'; clear.className = 'save-btn'; clear.textContent = 'Clear inputs';
+  clear.addEventListener('click', () => {
+    const tool = form.dataset.tool;
+    const defaults = { 'vd-solve': 'drop', 'vd-nominal': '230', 'tp-connection': 'star', 'dr-ka': '1', 'dr-kg': '1', 'dr-ki': '1', 'dr-ko': '1', 'conv-group': 'length' };
+    fields[tool].forEach((id) => { $(id).value = defaults[id] ?? ''; });
+    if (tool === 'conduit') { $('cf-cables').replaceChildren(); addCable(); }
+    if (tool === 'convert') populateUnits();
+    if (tool === 'vdrop') updateUnknown();
+    if (editingWorksheet?.tool === tool) editingWorksheet = null;
+    invalidate(tool); $(`${tool}-result`).replaceChildren();
+  });
+  form.append(clear);
+});
+function updateUnknown() {
+  const key = { drop: 'vd-vd', current: 'vd-i', length: 'vd-l', mvPerAmpPerM: 'vd-k' }[$('vd-solve').value];
+  ['vd-vd', 'vd-i', 'vd-l', 'vd-k'].forEach((id) => { $(id).disabled = id === key; $(id).placeholder = id === key ? 'calculated below' : ''; });
 }
-$('cf-add').addEventListener('click', () => addCable());
-addCable(); addCable(); // start with two
-
-function calcConduit() {
-  const ds = [...document.querySelectorAll('.cf-d')]
-    .map((el) => parseFloat(el.value)).filter((v) => Number.isFinite(v) && v > 0);
-  const result = SparkitCalculators.conduitFill({ internalDiameter: num('cf-id'), cableDiameters: ds });
-  if (!result.ok) return show('cf-result', result.message, 'bad');
-  show('cf-result',
-    `<b>Geometric fill = ${fmt(result.fillPercent, 1)}%</b> (${ds.length} cable${ds.length > 1 ? 's' : ''})\nCable area ${fmt(result.cableArea, 1)} mm² of conduit area ${fmt(result.conduitArea, 1)} mm²\nCheck the applicable enclosure/space-factor rule before using this result.`,
-    '');
+$('vd-solve').addEventListener('change', updateUnknown); updateUnknown();
+function addCable(value = '') {
+  const row = document.createElement('div'); row.className = 'cable-row';
+  const label = document.createElement('label'); label.textContent = 'Cable overall diameter (mm)';
+  const input = document.createElement('input'); input.inputMode = 'decimal'; input.className = 'cf-d'; input.value = value; label.append(input);
+  const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '×'; remove.setAttribute('aria-label', 'Remove cable');
+  remove.addEventListener('click', () => { row.remove(); invalidate('conduit'); }); row.append(label, remove); $('cf-cables').append(row);
 }
-
-// ---- Deratings --------------------------------------------------
-function calcDerate() {
-  const base = num('dr-base'), load = num('dr-load');
-  const ka = num('dr-ka') ?? 1, kg = num('dr-kg') ?? 1, ki = num('dr-ki') ?? 1, ko = num('dr-ko') ?? 1;
-  const result = SparkitCalculators.derating({ base, load, factors: [ka, kg, ki, ko] });
-  if (!result.ok) return show('dr-result', result.message, 'bad');
-  let line = `<b>Corrected capacity = ${fmt(result.capacity, 1)} A</b>\nBase ${fmt(base, 1)} A × ${fmt(ka, 2)} × ${fmt(kg, 2)} × ${fmt(ki, 2)} × ${fmt(ko, 2)}`;
-  if (load !== null) {
-    line += `\nDesign load ${fmt(load, 1)} A — ` +
-      (result.comparison ? '<span class="tag-ok">capacity is above this load</span>' : '<span class="tag-bad">capacity is below this load</span>') +
-      '\nThis is a numerical comparison; confirm cable selection requirements.';
-    return show('dr-result', line, result.comparison ? 'ok' : 'bad');
+addCable();
+$('cf-add').addEventListener('click', () => { addCable(); invalidate('conduit'); });
+function populateUnits() {
+  const units = C.UNIT_GROUPS[$('conv-group').value].units;
+  for (const id of ['conv-from', 'conv-to']) {
+    $(id).replaceChildren(); Object.entries(units).forEach(([key, [name]]) => $(id).add(new Option(name, key)));
   }
-  show('dr-result', line, '');
+  $('conv-to').selectedIndex = Math.min(2, Object.keys(units).length - 1);
 }
-
-// ---- wiring buttons ---------------------------------------------
-const calcs = { ohms: calcOhms, vdrop: calcVdrop, three: calcThree, conduit: calcConduit, derate: calcDerate };
-document.querySelectorAll('[data-calc]').forEach((b) =>
-  b.addEventListener('click', () => calcs[b.dataset.calc]()));
-
-const clearSets = {
-  ohms: ['ohm-v', 'ohm-i', 'ohm-r', 'ohm-p', 'ohm-result'],
-  vdrop: ['vd-vd', 'vd-i', 'vd-l', 'vd-k', 'vd-result'],
-  three: ['tp-vl', 'tp-il', 'tp-pf', 'tp-vph', 'tp-result'],
-  conduit: ['cf-id', 'cf-result'],
-  derate: ['dr-base', 'dr-load', 'dr-result'],
+Object.entries(C.UNIT_GROUPS).forEach(([key, group]) => $('conv-group').add(new Option(group.label, key))); populateUnits();
+$('conv-group').addEventListener('change', populateUnits);
+$('conv-swap').addEventListener('click', () => {
+  const from = $('conv-from').value; $('conv-from').value = $('conv-to').value; $('conv-to').value = from; invalidate('convert');
+});
+const examples = {
+  ohms: { 'ohm-v': '230', 'ohm-i': '10', 'ohm-r': '', 'ohm-p': '' },
+  vdrop: { 'vd-solve': 'drop', 'vd-vd': '', 'vd-i': '10', 'vd-l': '20', 'vd-k': '18', 'vd-nominal': '230', 'vd-limit': '' },
+  three: { 'tp-connection': 'star', 'tp-vl': '400', 'tp-il': '10', 'tp-pf': '0.8' },
+  conduit: { 'cf-id': '20', cables: ['5', '5'] },
+  derate: { 'dr-base': '32', 'dr-load': '20', 'dr-ka': '0.9', 'dr-kg': '0.8', 'dr-ki': '1', 'dr-ko': '1' },
 };
-document.querySelectorAll('[data-clear]').forEach((b) =>
-  b.addEventListener('click', () => {
-    (clearSets[b.dataset.clear] || []).forEach((id) => {
-      const el = $(id);
-      if (!el) return;
-      if (el.classList.contains('result')) { el.innerHTML = ''; el.className = 'result'; }
-      else el.value = '';
-      delete el.dataset?.derived;
+function restore(tool, inputs) {
+  if (tool === 'convert') { $('conv-group').value = inputs['conv-group']; populateUnits(); }
+  fields[tool].forEach((id) => { $(id).value = inputs[id] ?? ''; });
+  if (tool === 'conduit') { $('cf-cables').replaceChildren(); (inputs.cables || ['']).forEach(addCable); }
+  if (tool === 'vdrop') updateUnknown();
+}
+document.querySelectorAll('[data-example]').forEach((button) => button.addEventListener('click', () => {
+  editingWorksheet = null; const tool = button.dataset.example; restore(tool, examples[tool]); calculate(tool);
+}));
+document.querySelectorAll('[data-save]').forEach((button) => button.addEventListener('click', () => {
+  saveTool = button.dataset.save;
+  if (!snapshots.has(saveTool)) return;
+  const record = editingWorksheet?.tool === saveTool ? editingWorksheet : null;
+  $('save-name').value = record?.name || names[saveTool]; $('save-notes').value = record?.notes || ''; $('save-status').textContent = '';
+  $('save-heading').textContent = 'Save worksheet'; $('save-update').hidden = !record; $('save-dialog').showModal(); $('save-name').focus();
+}));
+$('save-cancel').addEventListener('click', () => $('save-dialog').close());
+$('save-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const snapshot = snapshots.get(saveTool);
+  if (!snapshot) { $('save-status').textContent = 'Recalculate before saving.'; return; }
+  try {
+    const current = e.submitter?.id === 'save-update' && editingWorksheet?.tool === saveTool ? editingWorksheet : null;
+    const record = { id: current?.id || crypto.randomUUID(), ...snapshot, name: $('save-name').value.trim(), notes: $('save-notes').value.trim(), updated: new Date().toISOString() };
+    getStore().save(record); editingWorksheet = null; $('save-dialog').close(); navigate('saved');
+    $('saved-status').textContent = 'Worksheet saved on this device.';
+  } catch (err) { $('save-status').textContent = err.message; }
+});
+function renderSaved() {
+  const list = $('saved-list'); list.replaceChildren(); $('saved-status').textContent = '';
+  try {
+    const q = $('saved-search').value.trim().toLowerCase();
+    const records = getStore().list().filter((r) => [r.name, r.notes, names[r.tool]].join(' ').toLowerCase().includes(q));
+    if (!records.length) { const p = document.createElement('p'); p.className = 'empty'; p.textContent = q ? 'No worksheets match your search.' : 'Your next calculation can become your first worksheet. Calculate, then tap Save worksheet.'; list.append(p); }
+    records.forEach((record) => {
+      const card = document.createElement('article'); card.className = 'card worksheet';
+      const title = document.createElement('h2'); title.textContent = record.name;
+      const meta = document.createElement('p'); meta.className = 'clause'; meta.textContent = `${names[record.tool]} · ${new Date(record.updated).toLocaleDateString('en-AU')}`;
+      const summary = document.createElement('p'); summary.textContent = typeof record.summary === 'string' ? record.summary : 'Open to recalculate.';
+      const notes = document.createElement('p'); notes.className = 'clause'; notes.textContent = record.notes;
+      const open = document.createElement('button'); open.type = 'button'; open.className = 'save-btn'; open.textContent = 'Open & recalculate';
+      open.addEventListener('click', () => {
+        try { restore(record.tool, record.inputs); editingWorksheet = record; navigate(record.tool === 'derate' ? 'conduit' : record.tool); calculate(record.tool); }
+        catch { $('saved-status').textContent = 'This worksheet cannot be opened by this version. Its saved data is preserved.'; }
+      });
+      card.append(title, meta, summary, notes, open); list.append(card);
     });
-    if (b.dataset.clear === 'derate') ['dr-ka', 'dr-kg', 'dr-ki', 'dr-ko'].forEach((id) => ($(id).value = '1.00'));
-  }));
-
-// ---- Ask a standard ---------------------------------------------
-// Signposts only: point to the standard + clause and give light orientation.
-// Deliberately does NOT hand over the regulated figures — apprentices read,
-// learn, and the licensed person carries final responsibility.
-const KB = [
-  { q: 'Maximum voltage drop allowed?', topic: 'Voltage drop limits',
-    std: 'AS/NZS 3000 — Clause 3.6.2', tool: 'vdrop',
-    gist: 'The maximum permissible voltage drop and how it is shared across the installation.',
-    keys: 'voltage drop volt drop vd percent max limit run length' },
-  { q: 'RCD required on power points / lighting?', topic: 'Additional protection (RCDs)',
-    std: 'AS/NZS 3000 — Section 2.6',
-    gist: 'Which final subcircuits need RCD protection and the maximum trip current.',
-    keys: 'rcd safety switch power point gpo socket lighting protection trip ma' },
-  { q: 'Cable identification colours', topic: 'Conductor identification',
-    std: 'AS/NZS 3000 — Clause 3.8',
-    gist: 'Approved colours for active, neutral and earth, including three-phase.',
-    keys: 'cable colour color active neutral earth phase identification wire' },
-  { q: 'Conduit fill / cable space factor', topic: 'Wiring enclosures — space factor',
-    std: 'AS/NZS 3000 — Section 3', tool: 'conduit',
-    gist: 'Permissible cable space factor for the number of cables in an enclosure.',
-    keys: 'conduit fill space factor enclosure how many cables duct' },
-  { q: 'Automatic disconnection times', topic: 'Earth fault — disconnection times',
-    std: 'AS/NZS 3000 — Section 1.5 & Section 5',
-    gist: 'Required disconnection times by circuit type and earthing arrangement.',
-    keys: 'disconnection time fault clearance seconds earthing loop impedance' },
-  { q: 'What does an IP rating mean?', topic: 'Ingress protection ratings',
-    std: 'AS 60529',
-    gist: 'What each IP digit certifies against solids/dust and against water.',
-    keys: 'ip rating ingress protection dust water ip65 ip66 ip44 degrees' },
-  { q: 'Standard supply voltages (single / three phase)', topic: 'Standard voltages',
-    std: 'AS 60038', tool: 'three',
-    gist: 'Nominal supply voltages and the line-to-phase relationship.',
-    keys: 'voltage 230 400 415 single three phase nominal supply line' },
-  { q: 'GPO / switch mounting heights', topic: 'Mounting heights & accessibility',
-    std: 'AS/NZS 3000 + AS 1428.1',
-    gist: '3000 sets no general height; AS 1428.1 governs accessible heights — check the job spec.',
-    keys: 'gpo height power point switch socket mounting accessible 1428' },
-  { q: 'Main earthing conductor sizing', topic: 'Earthing — conductor sizing',
-    std: 'AS/NZS 3000 — Section 5 (Table 5.1)',
-    gist: 'Sizing the main earthing conductor from the active conductor size.',
-    keys: 'earth size main earthing conductor protective ground table 5.1 men' },
-  { q: 'Maximum demand (domestic)', topic: 'Maximum demand assessment',
-    std: 'AS/NZS 3000 — Appendix C',
-    gist: 'The assessment (column) method for maximum demand by load group.',
-    keys: 'maximum demand max demand load assessment domestic column method' },
-  { q: 'Cable current-carrying capacity / sizing', topic: 'Current-carrying capacity',
-    std: 'AS/NZS 3008.1.1', tool: 'conduit',
-    gist: 'Base current ratings, then derating for temperature, grouping and install method.',
-    keys: 'cable size current carrying capacity ccc rating ampacity derate 3008' },
-  { q: 'Minimum cable size for a circuit', topic: 'Selecting cable size',
-    std: 'AS/NZS 3008 + AS/NZS 3000', tool: 'vdrop',
-    gist: 'Driven by current-carrying capacity AND voltage drop for the actual load.',
-    keys: 'minimum cable size lighting power 2.5 1.5 csa select circuit' },
-  { q: 'MEN / earthing system requirements', topic: 'Earthing system (MEN)',
-    std: 'AS/NZS 3000 — Section 5',
-    gist: 'Multiple Earthed Neutral system requirements and connections.',
-    keys: 'men earthing system neutral earth bond section 5 equipotential' },
-  { q: 'Power factor explained', topic: 'Power factor fundamentals',
-    std: 'Fundamentals (no single clause)', tool: 'three',
-    gist: 'Real vs apparent power; power factor = cosφ.',
-    keys: 'power factor cos phi kw kva reactive' },
-];
-
-const TOOL_NAMES = { vdrop: 'Voltage Drop', three: 'Three-Phase', conduit: 'Conduit & Deratings', ohms: "Ohm's Law" };
-const askInput = $('ask-input');
-const askResults = $('ask-results');
-
-function askSearch(q) {
-  const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
-  if (!tokens.length) return [];
-  return KB
-    .map((e) => {
-      const hay = (e.q + ' ' + e.topic + ' ' + e.keys).toLowerCase();
-      return { e, score: tokens.reduce((s, t) => s + (hay.includes(t) ? 1 : 0), 0) };
-    })
-    .filter((x) => x.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 6)
-    .map((x) => x.e);
+  } catch (err) { $('saved-status').textContent = err.message; }
 }
-
-function askRenderList(list) {
-  if (!list.length) {
-    askResults.innerHTML = '<div class="ask-sug" data-empty>No match yet — try “voltage drop”, “RCD”, “conduit”, “colours”, “earthing”.</div>';
-  } else {
-    askResults.innerHTML = list
-      .map((e) => `<div class="ask-sug" data-i="${KB.indexOf(e)}"><span class="sug-q">${e.q}</span><span class="sug-std">${e.std}</span></div>`)
-      .join('');
-  }
-  askResults.hidden = false;
-}
-
-function askRenderAnswer(e) {
-  const openBtn = e.tool
-    ? `<button class="btn open" data-open="${e.tool}">Open ${TOOL_NAMES[e.tool]} calc →</button>`
-    : '';
-  askResults.innerHTML =
-    `<div class="ask-answer">
-       <p class="topic">${e.topic}</p>
-       <p class="std">📖 ${e.std}</p>
-       <p class="gist">${e.gist}</p>
-       ${openBtn}
-       <p class="own">Read the clause and learn it — once you're licensed this is yours to know, and final responsibility always sits with the licensed person.</p>
-     </div>`;
-  askResults.hidden = false;
-}
-
-askInput.addEventListener('input', () => {
-  const q = askInput.value.trim();
-  if (q.length < 2) { askResults.hidden = true; askResults.innerHTML = ''; return; }
-  askRenderList(askSearch(q));
+$('saved-search').addEventListener('input', renderSaved);
+$('saved-export').addEventListener('click', () => {
+  try {
+    const blob = new Blob([getStore().export()], { type: 'application/json' }); const url = URL.createObjectURL(blob);
+    const link = document.createElement('a'); link.href = url; link.download = 'sparkit-worksheets.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (err) { $('saved-status').textContent = err.message; }
 });
-askInput.addEventListener('keydown', (ev) => {
-  if (ev.key === 'Enter') {
-    const top = askSearch(askInput.value.trim())[0];
-    if (top) askRenderAnswer(top);
-  }
+$('saved-import').addEventListener('click', () => $('saved-file').click());
+$('saved-file').addEventListener('change', async () => {
+  const file = $('saved-file').files[0]; if (!file) return;
+  try {
+    if (file.size > 2 * 1024 * 1024) throw new Error('Choose a worksheet backup smaller than 2 MB.');
+    const result = getStore().import(await file.text()); renderSaved();
+    $('saved-status').textContent = `${result.imported} worksheets restored; ${result.skipped} already present (existing copies kept).`;
+  } catch (err) { $('saved-status').textContent = err.message; }
+  finally { $('saved-file').value = ''; }
 });
-askResults.addEventListener('click', (ev) => {
-  ev.stopPropagation(); // keep the "tap outside to close" handler from firing on our own clicks
-  const sug = ev.target.closest('.ask-sug');
-  if (sug && sug.dataset.i !== undefined) return askRenderAnswer(KB[+sug.dataset.i]);
-  const open = ev.target.closest('[data-open]');
-  if (open) {
-    document.querySelector(`.tab[data-go="${open.dataset.open}"]`).click();
-    askResults.hidden = true;
-    askInput.value = '';
-  }
-});
-document.addEventListener('click', (ev) => {
-  if (!$('ask').contains(ev.target)) askResults.hidden = true;
-});
-
-// ---- service worker (offline) -----------------------------------
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
-}
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
