@@ -14,7 +14,8 @@ http://127.0.0.1:5174. There are no packages to install or API keys to configure
 - Conduit geometry and user-supplied cable correction factors.
 - Length, area, voltage, current, resistance and power unit conversions.
 - Named worksheets: original inputs, working and notes, stored on this device.
-  Reopen and recalculate; export a JSON backup from Saved. Browser storage is
+  Reopen and recalculate; export or restore a JSON backup from Saved. Restore
+  skips IDs already on this device and preserves existing copies. Browser storage is
   device-specific, can be cleared by browser settings, and is not cloud sync.
 
 Use current applicable table values and installation requirements. Numerical
@@ -26,6 +27,11 @@ source-check dates; there is no live regulatory feed or generated legal advice.
 `calculators.js` is pure maths; `worksheets.js` validates and stores snapshots;
 `app.js` connects them to the page. Only app-shell assets are cached offline.
 GitHub Pages serves the root of `main`. Test and smoke-test before merging.
+
+The repeatable browser smoke script is `scripts/browser-smoke.js`. Start the
+local preview, open it in an isolated Playwright CLI session, then use
+`playwright-cli run-code --filename scripts/browser-smoke.js`. It uses synthetic
+worksheets only and checks 320/390/1280px layouts, backup restore and offline use.
 
 ## Origin
 

@@ -3,6 +3,8 @@
   "short_name": "Sparkit",
   "description": "Electrical calculators and rules reference for AU/NZ apprentices.",
   "start_url": "./index.html",
+  "scope": "./",
+  "id": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0f1115",
