@@ -1,0 +1,9 @@
+.DS_Store
+node_modules/
+.playwright-cli/
+output/
+.env
+.env.*
+*.log
+*worksheets*.json
+!package.json
